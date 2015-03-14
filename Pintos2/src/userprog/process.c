@@ -468,6 +468,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+void resize(void** esp, int argc, char** argv) {
+	int s = (size_t) *esp % 4;
+	if (s) {
+		*esp -= s;
+		memcpy(*esp, &argv[argc], s);
+    }
+ }
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
@@ -509,11 +517,7 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
   argv[argc] = 0;
   
   //Resize to be a multiple of our word size
-  int s = (size_t) *esp % 4;
-  if (s) {
-      *esp -= s;
-      memcpy(*esp, &argv[argc], s);
-  }
+  resize(esp, argc, argv);
     
   // Push argv[i] for all i
   int i = argc;
