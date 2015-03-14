@@ -73,12 +73,12 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_WRITE:      
 		arg[2] = user_to_kernel_ptr((const void *) arg[2]);
 		f->eax = write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
-		break;      
-    case SYS_SEEK:      
-		seek(arg[1], (unsigned) arg[2]);
-		break;     
+		break;              
     case SYS_TELL:      
 		f->eax = tell(arg[1]);
+		break;
+	case SYS_SEEK:      
+		seek(arg[1], (unsigned) arg[2]);
 		break;
     case SYS_CLOSE:      
 		close(arg[1]);
@@ -110,8 +110,9 @@ pid_t exec (const char *cmd_line)
   if (child == NULL)
 		return -1;
   
+  //busy waiting fun
   while (child->load == NOT_LOADED)    
-      barrier();
+      thread_yield();      
           
   if (child->load == FAIL)    
       return -1;
@@ -140,21 +141,21 @@ bool remove (const char *file) {
 int open (const char *file) {
   lock_acquire(&fs_lock);
   struct file *f = filesys_open(file);
-  if (!f)
+  if (f == NULL)
     {
       lock_release(&fs_lock);
       return -1;
     }
-  int fd = process_add_file(f);
+  int fd = add_file(f);
   lock_release(&fs_lock);
   return fd;
 }
 
 int filesize (int fd) {	
   lock_acquire(&fs_lock);
-  struct file *f = process_get_file(fd);
+  struct file *f = get_file(fd);
   
-  if (!f) {
+  if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
   }
@@ -175,7 +176,7 @@ int read (int fd, void *buffer, unsigned size) {
    }
    
   lock_acquire(&fs_lock);
-  struct file *f = process_get_file(fd);
+  struct file *f = get_file(fd);
   if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
@@ -191,7 +192,7 @@ int write (int fd, const void *buffer, unsigned size) {
       return size;
     }
   lock_acquire(&fs_lock);
-  struct file *f = process_get_file(fd);
+  struct file *f = get_file(fd);
   if (!f) {
       lock_release(&fs_lock);
       return -1;
@@ -204,8 +205,8 @@ int write (int fd, const void *buffer, unsigned size) {
 void seek (int fd, unsigned position)
 {
   lock_acquire(&fs_lock);
-  struct file *f = process_get_file(fd);
-  if (!f)
+  struct file *f = get_file(fd);
+  if (f == NULL)
     {
       lock_release(&fs_lock);
       return;
@@ -216,8 +217,8 @@ void seek (int fd, unsigned position)
 
 unsigned tell (int fd) {
   lock_acquire(&fs_lock);
-  struct file *f = process_get_file(fd);
-  if (!f) {
+  struct file *f = get_file(fd);
+  if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
   }
@@ -230,7 +231,7 @@ unsigned tell (int fd) {
 void close (int fd)
 {
   lock_acquire(&fs_lock);
-  process_close_file(fd);
+  close_file(fd);
   lock_release(&fs_lock);
 }
 
@@ -245,14 +246,14 @@ int user_to_kernel_ptr (const void *addr) {
 	struct thread *cur = thread_current();
 	check_valid_ptr(addr);
 	void  *ptr = pagedir_get_page(cur->pagedir, addr);
-	if (!ptr)
+	if (ptr == NULL)
 		exit(-1);
 
 	return (int) ptr;
 }
 
 
-int process_add_file (struct file *f) {
+int add_file (struct file *f) {
 	//I could use simpler names for variables, but when I debug, sometimes having file names
 	//with more than 2 letters speeds up my thinking.
 	struct process_helper *proc_file = malloc(sizeof(struct process_helper));
@@ -266,7 +267,7 @@ int process_add_file (struct file *f) {
   	return proc_file->fd;
 }
 
-struct file* process_get_file(int fd) {
+struct file* get_file(int fd) {
 	struct thread  *cur = thread_current();
 	struct list_elem *cntr = list_begin(&cur->file_list);
 	struct process_helper *pf;
@@ -283,7 +284,7 @@ struct file* process_get_file(int fd) {
 	return NULL;
 }
 
-void process_close_file (int fd) {
+void close_file (int fd) {
   struct thread *cur = thread_current();
   struct list_elem *iterator = list_begin(&cur->file_list);
 

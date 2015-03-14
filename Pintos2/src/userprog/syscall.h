@@ -45,7 +45,9 @@ struct child_process* get_child_process (int pid);
 void remove_child_process (struct child_process *cp);
 void remove_child_processes (void);
 
-void process_close_file (int fd);
+int add_file (struct file *f);
+struct file* get_file(int fd);
+void close_file (int fd);
 
 void syscall_init (void);
 

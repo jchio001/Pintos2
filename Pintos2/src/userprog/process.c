@@ -125,7 +125,7 @@ process_exit (void)
   uint32_t *pd;
 
   // Close all files opened by process
-  process_close_file(-1);
+  close_file(-1);
 
   // Free child list
   remove_child_processes();
