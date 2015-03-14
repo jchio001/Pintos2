@@ -101,14 +101,12 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    // Needed for file system sys calls
-    struct list file_list;
-    int fd;
-
-    // Needed for wait / exec sys calls
-    struct list child_list;
+    
+    struct list file_list; //LIST OF FILES PROCESS HAS
+    int fd; //FILE DESCRIPTOR.
+    struct list child_list; //LIST OF CHILDREN
     tid_t parent_id;
-    // Points to child_process struct in parent's child list
+    // Points to a child in parent's child list
     struct child_process* cp;
   };
 
