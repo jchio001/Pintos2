@@ -29,13 +29,15 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  int i, arg[4];
-  //PARSING STUFF INTO ARG HERE!!1
-  for (i = 0; i < 4; i++)    
-      arg[i] = * ((int *) f->esp + i);
+  int i = 0;
+  int arg[4];
+  //PARSING STUFF INTO ARG HERE!!1    
+  for (i; i < 4; i++)    
+      arg[i] = * ((int *) f->esp + i);  
   
   switch (arg[0]) {
     case SYS_HALT:      

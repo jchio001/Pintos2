@@ -475,6 +475,7 @@ static bool
 setup_stack (void **esp, const char* file_name, char** save_ptr) 
 {
   uint8_t *kpage;
+  //initialize to false since always assume the worst.
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
@@ -484,16 +485,17 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
         *esp = PHYS_BASE;
       else {
 		palloc_free_page (kpage);
-		return success;
+		return false;
 	  }
    }
-
-  char *token;
-  char **argv = malloc(2*sizeof(char *));  
+  
   int argc = 0;
   int argv_size = 2;
-
-  // Push args onto stack
+  
+  char *token;
+  char **argv = malloc(2*sizeof(char *));  
+  
+  // Pushing our args onto the stack
   for (token = (char *) file_name; token != NULL; token = strtok_r (NULL, " ", save_ptr)) {
       *esp -= strlen(token) + 1;
       argv[argc] = *esp;
