@@ -30,6 +30,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int i, arg[4];
+  //PARSING STUFF INTO ARG HERE!!1
   for (i = 0; i < 4; i++)    
       arg[i] = * ((int *) f->esp + i);
   
@@ -68,8 +69,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		break;      
     case SYS_WRITE:      
 		arg[2] = user_to_kernel_ptr((const void *) arg[2]);
-		f->eax = write(arg[1], (const void *) arg[2],
-				   (unsigned) arg[3]);
+		f->eax = write(arg[1], (const void *) arg[2], (unsigned) arg[3]);
 		break;      
     case SYS_SEEK:      
 		seek(arg[1], (unsigned) arg[2]);
@@ -103,7 +103,7 @@ pid_t exec (const char *cmd_line)
 {
   pid_t pid = process_execute(cmd_line);
   struct child_process* child = get_child_process(pid);
-  //ASSERT(cp);
+  
   if (child == NULL)
 		return -1;
   
