@@ -250,9 +250,7 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
-  bool success = false;
-  //##char* charPointer;          ##Add this for parsing
-  int i;
+  bool success = false; 
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -263,11 +261,10 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
   /* Open executable file. */
   lock_acquire(&fs_lock); 
   file = filesys_open(file_name);
-  if (file == NULL) 
-    {
+  if (file == NULL) {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
-    }
+   }
    file_deny_write(file);   
    //##Disable file write for 'file' here. GO TO BOTTOM. DON'T CHANGE ANYTHING IN THESE IF AND FOR STATEMENTS  
 
@@ -286,7 +283,8 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
-  for (i = 0; i < ehdr.e_phnum; i++) 
+  int i = 0;
+  for (; i < ehdr.e_phnum; i++) 
     {
       struct Elf32_Phdr phdr;
 
@@ -494,7 +492,7 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
 		palloc_free_page (kpage);
 		return false;
 	  }
-   }
+  }
   
   int argc = 0;
   int argv_size = 2;
@@ -503,7 +501,7 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
   char **argv = malloc(2*sizeof(char *));  
   
   // Pushing our args onto the stack
-  for (token = (char *) file_name; token != NULL; token = strtok_r (NULL, " ", save_ptr)) {
+  for (token = (char *) file_name; token != NULL; token = strtok_r(NULL, " ", save_ptr)) {
       *esp -= strlen(token) + 1;
       argv[argc] = *esp;
       argc++;
@@ -526,7 +524,7 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
       *esp -= sizeof(char *);
       memcpy(*esp, &argv[i], sizeof(char *));
     }
-  // Push argv, then argc, then our fake return address, then free argv
+  // Push argv, then argc, then our "return address", then free argv
   token = *esp;
   *esp -= sizeof(char **);
   memcpy(*esp, &token, sizeof(char **));  

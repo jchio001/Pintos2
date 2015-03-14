@@ -484,6 +484,8 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->file_list);
   t->fd = MIN_FD;
 
+  //I think I forgot to initalize a list in Proj1, which is why we failed
+  //a good amount of tests
   list_init(&t->child_list);
   t->cp = NULL;
   t->parent_id = NO_PARENT;

@@ -3,7 +3,9 @@
 
 #include "threads/synch.h"
 
-struct lock fs_lock;
+struct lock fs_lock; //our filesystems lock
+
+//used for loading
 enum load_state {NOT_LOADED, SUCCESS, FAIL};
 
 struct process_helper {
@@ -31,20 +33,18 @@ int open (const char *file);
 int filesize (int fd);
 int read (int fd, void *buffer, unsigned size);
 int write (int fd, const void *buffer, unsigned size);
-void seek (int fd, unsigned position);
+void seek (int fd, unsigned pos);
 unsigned tell (int fd);
 void close (int fd);
 
-int process_add_file (struct file *f);
-struct file* process_get_file (int fd);
 int user_to_kernel_ptr(const void *vaddr);
-
 void check_valid_ptr (const void *ptr);
 struct child_process* add_child_process (int pid);
 struct child_process* get_child_process (int pid);
 void remove_child_process (struct child_process *cp);
 void remove_child_processes (void);
 
+//file-related helper functions
 int add_file (struct file *f);
 struct file* get_file(int fd);
 void close_file (int fd);

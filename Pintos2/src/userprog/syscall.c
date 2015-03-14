@@ -143,14 +143,19 @@ bool remove (const char *file) {
 int open (const char *file) {
   lock_acquire(&fs_lock);
   struct file *f = filesys_open(file);
-  if (f == NULL)
-    {
+  if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
-    }
+  }
   int fd = add_file(f);
   lock_release(&fs_lock);
   return fd;
+}
+
+void close (int fd) {
+  lock_acquire(&fs_lock);
+  close_file(fd);
+  lock_release(&fs_lock);
 }
 
 int filesize (int fd) {	
@@ -169,10 +174,10 @@ int filesize (int fd) {
 
 int read (int fd, void *buffer, unsigned size) {
   unsigned counter = 0;
-  uint8_t* buff_local = (uint8_t *) buffer;
+  uint8_t* buff = (uint8_t *) buffer;
   if (fd == 0) {
       for (; counter < size; counter++) {
-	  buff_local[counter] = input_getc();
+	  buff[counter] = input_getc();
       }
       return size;
    }
@@ -183,16 +188,19 @@ int read (int fd, void *buffer, unsigned size) {
       lock_release(&fs_lock);
       return -1;
   }
+  
   int read_bytes = file_read(f, buffer, size);
   lock_release(&fs_lock);
   return read_bytes;
 }
 
 int write (int fd, const void *buffer, unsigned size) {
+  
   if (fd == 1) {
       putbuf(buffer, size);
       return size;
-    }
+  }
+  
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
   if (!f) {
@@ -204,37 +212,31 @@ int write (int fd, const void *buffer, unsigned size) {
   return write_bytes;
 }
 
-void seek (int fd, unsigned position)
+void seek (int fd, unsigned pos)
 {
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
-  if (f == NULL)
-    {
+  if (f == NULL) {
       lock_release(&fs_lock);
       return;
-    }
-  file_seek(f, position);
+  }
+  file_seek(f, pos);
   lock_release(&fs_lock);
 }
 
 unsigned tell (int fd) {
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
+  
   if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
   }
+  
   //off_t = 32 bit integer. Defined in off_t.h.
   off_t offset = file_tell(f);
   lock_release(&fs_lock);
   return offset;
-}
-
-void close (int fd)
-{
-  lock_acquire(&fs_lock);
-  close_file(fd);
-  lock_release(&fs_lock);
 }
 
 void check_valid_ptr (const void *ptr) {
@@ -264,7 +266,7 @@ int add_file (struct file *f) {
 		
   	proc_file->file = f;
   	proc_file->fd = thread_current()->fd;
-  	++(thread_current()->fd);
+  	(thread_current()->fd)++;
   	list_push_back(&thread_current()->file_list, &proc_file->elem);
   	return proc_file->fd;
 }
@@ -272,12 +274,12 @@ int add_file (struct file *f) {
 struct file* get_file(int fd) {
 	struct thread  *cur = thread_current();
 	struct list_elem *cntr = list_begin(&cur->file_list);
-	struct process_helper *pf;
+	struct process_helper *ph;
 
 	for (; cntr != list_end(&cur->file_list); cntr = list_next(cntr)) {
-		pf = list_entry(cntr, struct process_helper, elem);
-		if (fd == pf->fd)
-			return pf->file;
+		ph = list_entry(cntr, struct process_helper, elem);
+		if (fd == ph->fd)
+			return ph->file;
 	}
 	//If we are unable to obtain the file, we want to return NULL because
 	//whatever function calling process_get_file will probably check for NULL
@@ -293,15 +295,15 @@ void close_file (int fd) {
   struct list_elem *next;
   for (;iterator != list_end (&cur->file_list); iterator = next) {
       next = list_next(iterator);
-      struct process_helper *pf = list_entry (iterator, struct process_helper, elem);
+      struct process_helper *ph = list_entry (iterator, struct process_helper, elem);
       
-      bool sameFD = (fd == pf->fd);
-      bool closeFile = fd == -1;
+      bool sameFD = (fd == ph->fd);
+      bool closeFile = (fd == -1);
       
       if (sameFD || closeFile) {
-	  file_close(pf->file);
-	  list_remove(&pf->elem);
-	  free(pf);
+	  file_close(ph->file);
+	  list_remove(&ph->elem);
+	  free(ph);
 	  if (fd > -1)
 	      return;
 	    
