@@ -15,9 +15,12 @@
 #include "userprog/process.h"
 
 //I have no idea why, but if I move this declaration to syscall.h, 
-//I get a ton of warnigns and errors. But if I leave it here, everything's
+//I get a ton of warnings and errors. But if I leave it here, everything's
 //fine. What?
 static void syscall_handler (struct intr_frame *);
+//compiler also spazzes out if anything with pid_t is in syscall.h. ???
+pid_t exec(const char *cmd_line);
+int wait (pid_t pid);
 
 void
 syscall_init (void) 
@@ -122,16 +125,16 @@ int wait (pid_t pid) {
 
 bool create (const char *file, unsigned initial_size) {
   lock_acquire(&fs_lock);
-  bool success = filesys_create(file, initial_size);
+  bool create_succ = filesys_create(file, initial_size);
   lock_release(&fs_lock);
-  return success;
+  return create_succ;
 }
 
 bool remove (const char *file) {
   lock_acquire(&fs_lock);
-  bool success = filesys_remove(file);
+  bool remove_succ = filesys_remove(file);
   lock_release(&fs_lock);
-  return success;
+  return remove_succ;
 }
 
 int open (const char *file) {
@@ -177,9 +180,9 @@ int read (int fd, void *buffer, unsigned size) {
       lock_release(&fs_lock);
       return -1;
   }
-  int bytes = file_read(f, buffer, size);
+  int read_bytes = file_read(f, buffer, size);
   lock_release(&fs_lock);
-  return bytes;
+  return read_bytes;
 }
 
 int write (int fd, const void *buffer, unsigned size) {
@@ -193,9 +196,9 @@ int write (int fd, const void *buffer, unsigned size) {
       lock_release(&fs_lock);
       return -1;
   }
-  int bytes = file_write(f, buffer, size);
+  int write_bytes = file_write(f, buffer, size);
   lock_release(&fs_lock);
-  return bytes;
+  return write_bytes;
 }
 
 void seek (int fd, unsigned position)

@@ -231,10 +231,6 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-// Used for setup_stack
-#define WORD_SIZE 4
-#define DEFAULT_ARGV 2
-
 static bool setup_stack (void **esp, const char* file_name,
 			 char** save_ptr);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
@@ -493,50 +489,46 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
    }
 
   char *token;
-  char **argv = malloc(DEFAULT_ARGV*sizeof(char *));  
+  char **argv = malloc(2*sizeof(char *));  
   int argc = 0;
   int argv_size = 2;
 
   // Push args onto stack
-  for (token = (char *) file_name; token != NULL;
-       token = strtok_r (NULL, " ", save_ptr)) {
+  for (token = (char *) file_name; token != NULL; token = strtok_r (NULL, " ", save_ptr)) {
       *esp -= strlen(token) + 1;
       argv[argc] = *esp;
       argc++;
       // Resize argv
-      if (argc >= argv_size)
-	{
-	  argv_size *= 2;
-	  argv = realloc(argv, argv_size*sizeof(char *));
-	}
+      if (argc >= argv_size) {
+		argv_size *= 2;
+		argv = realloc(argv, argv_size*sizeof(char *));
+	  }
       memcpy(*esp, token, strlen(token) + 1);
   }
   argv[argc] = 0;
   
   //Resize to be a multiple of our word size
-  int i = (size_t) *esp % 4;
-  if (i) {
-      *esp -= i;
-      memcpy(*esp, &argv[argc], i);
+  int s = (size_t) *esp % 4;
+  if (s) {
+      *esp -= s;
+      memcpy(*esp, &argv[argc], s);
   }
     
   // Push argv[i] for all i
-  for (i = argc; i >= 0; i--)
+  int i = argc;
+  for (i; i >= 0; i--)
     {
       *esp -= sizeof(char *);
       memcpy(*esp, &argv[i], sizeof(char *));
     }
-  // Push argv
+  // Push argv, then argc, then our fake return address, then free argv
   token = *esp;
   *esp -= sizeof(char **);
-  memcpy(*esp, &token, sizeof(char **));
-  // Push argc
+  memcpy(*esp, &token, sizeof(char **));  
   *esp -= sizeof(int);
-  memcpy(*esp, &argc, sizeof(int));
-  // Push fake return addr
+  memcpy(*esp, &argc, sizeof(int));  
   *esp -= sizeof(void *);
-  memcpy(*esp, &argv[argc], sizeof(void *));
-  // Free argv
+  memcpy(*esp, &argv[argc], sizeof(void *));  
   free(argv);
 
   return success;
