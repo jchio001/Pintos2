@@ -261,15 +261,14 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
   process_activate ();
 
   /* Open executable file. */
-  //lock_acquire(&fs_lock); 
+  lock_acquire(&fs_lock); 
   file = filesys_open(file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-   file_deny_write(file);
-   //t->executable = file;
+   file_deny_write(file);   
    //##Disable file write for 'file' here. GO TO BOTTOM. DON'T CHANGE ANYTHING IN THESE IF AND FOR STATEMENTS  
 
 /* Read and verify executable header. */
@@ -356,7 +355,7 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
  done:
   /* We arrive here whether the load is successful or not. */
   //file_close (file);   //##Removed this!
-  //lock_release(&fs_lock);
+  lock_release(&fs_lock);
   return success;
 }
 
