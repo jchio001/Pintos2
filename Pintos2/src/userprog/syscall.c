@@ -1,4 +1,3 @@
-#include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <user/syscall.h>
@@ -13,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 
 //I have no idea why, but if I move this declaration to syscall.h, 
 //I get a ton of warnings and errors. But if I leave it here, everything's
@@ -203,7 +203,7 @@ int write (int fd, const void *buffer, unsigned size) {
   
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
-  if (!f) {
+  if (f == NULL) {
       lock_release(&fs_lock);
       return -1;
   }
@@ -319,9 +319,10 @@ struct child_process* add_child_process (int pid) {
 
 	cp->pid = pid;
 	cp->load = NOT_LOADED;
-	cp->wait = false;
-	cp->exit = false;
 	lock_init(&cp->wait_lock);
+	cp->wait = false;
+	cp->exit = false;	
+	
 	struct thread *cur = thread_current();
 	list_push_back(&cur->child_list, &cp->elem);
 	return cp;	
@@ -353,8 +354,7 @@ void remove_child_processes (void) {
   //I know just putting cntr has no effect, but putting it here looks cleaner for my eyes
   for (cntr; cntr != list_end (&cur->child_list); cntr = next) {
       next = list_next(cntr);
-      struct child_process *cp = list_entry (cntr, struct child_process,
-					     elem);
+      struct child_process *cp = list_entry (cntr, struct child_process, elem);
       list_remove(&cp->elem);
       free(cp);
       cntr = next;

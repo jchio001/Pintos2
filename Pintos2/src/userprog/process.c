@@ -1,5 +1,4 @@
 #include "userprog/process.h"
-#include <debug.h>
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
@@ -20,9 +19,15 @@
 #include "userprog/tss.h"
 #include "userprog/syscall.h"
 
+//moving declartions here to avoid random clutter.
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp,
 		  char** save_ptr);
+static bool setup_stack (void **esp, const char* file_name,
+			 char** save_ptr);
+static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+                          uint32_t read_bytes, uint32_t zero_bytes,
+                          bool writable);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -71,15 +76,17 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
-  if (success)
+  
+  if (success) {
       thread_current()->cp->load = SUCCESS;  
-  else
+	  palloc_free_page (file_name);
+  }
+  else {
+	  //EXIT ON FAILED LOAD
       thread_current()->cp->load = FAIL;    
-
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+      palloc_free_page (file_name);
+      thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -108,8 +115,9 @@ process_wait (tid_t child_tid UNUSED)
       return -1;
        
   cp->wait = true;
+  //busy-waiting fun
   while (!cp->exit)
-      barrier();    
+      thread_yield();    
   
   int child_status = cp->status;
   remove_child_process(cp);
@@ -120,16 +128,13 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  struct thread *cur = thread_current ();
-  //uint32_t *pd;
-
-  // Close all files opened by process
-  close_file(-1);
-
-  // Free child list
+  struct thread *cur = thread_current ();  
+  
+  //Close files then release the list of children
+  close_file(-1);  
   remove_child_processes();
 
-  // Set exit value to true in case killed by the kernel
+  //just in case the kernel interrupts us
   if (thread_alive(cur->parent_id))
       cur->cp->exit = true;    
 
@@ -230,12 +235,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, const char* file_name,
-			 char** save_ptr);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
-                          uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -465,6 +465,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+//for setup_stack
 void resize(void** esp, int argc, char** argv) {
 	int s = (size_t) *esp % 4;
 	if (s) {
@@ -477,12 +478,11 @@ void resize(void** esp, int argc, char** argv) {
    user virtual memory. */
 static bool
 setup_stack (void **esp, const char* file_name, char** save_ptr) 
-{
-  uint8_t *kpage;
+{  
   //initialize to false since always assume the worst.
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
@@ -518,11 +518,11 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)
     
   // Push argv[i] for all i
   int i = argc;
-  for (i; i >= 0; i--)
-    {
+  for (i; i >= 0; i--) {
       *esp -= sizeof(char *);
       memcpy(*esp, &argv[i], sizeof(char *));
-    }
+  }
+    
   // Push argv, then argc, then our "return address", then free argv
   token = *esp;
   *esp -= sizeof(char **);
