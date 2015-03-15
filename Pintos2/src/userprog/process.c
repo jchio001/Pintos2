@@ -73,7 +73,6 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
   if (success)
       thread_current()->cp->load = SUCCESS;  
-  
   else
       thread_current()->cp->load = FAIL;    
 
