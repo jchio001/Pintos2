@@ -345,6 +345,7 @@ void remove_child_process (struct child_process *cp) {
   free(cp);
 }
 
+//pretty much looping remove_child_process()
 void remove_child_processes (void) {
   struct thread *cur = thread_current();
   struct list_elem *next;
