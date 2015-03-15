@@ -123,8 +123,7 @@ process_wait (tid_t child_tid) {
 
 /* Free the current process's resources. */
 void
-process_exit (void)
-{
+process_exit (void) {
   struct thread *cur = thread_current ();  
   
   //Close files then release the list of children
@@ -157,8 +156,7 @@ process_exit (void)
    thread.
    This function is called on every context switch. */
 void
-process_activate (void)
-{
+process_activate (void) {
   struct thread *t = thread_current ();
 
   /* Activate thread's page tables. */
@@ -280,7 +278,7 @@ load (const char *file_name, void (**eip) (void), void **esp, char** saveptr)
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   int i = 0;
-  for (; i < ehdr.e_phnum; i++) 
+  for (i; i < ehdr.e_phnum; i++) 
     {
       struct Elf32_Phdr phdr;
 
