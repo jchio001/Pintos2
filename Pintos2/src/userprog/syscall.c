@@ -340,6 +340,7 @@ struct child_process* get_child_process(int pid) {
 	
 	return NULL;
 }
+
 void remove_child_process (struct child_process *cp) {
   list_remove(&cp->elem);
   free(cp);

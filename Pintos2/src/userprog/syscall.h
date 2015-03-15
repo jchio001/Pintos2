@@ -8,12 +8,14 @@ struct lock fs_lock; //our filesystems lock
 //used for loading
 enum load_state {NOT_LOADED, SUCCESS, FAIL};
 
+//helps out with some of our process functions
 struct process_helper {
 	struct file* file;
 	int fd;
 	struct list_elem elem;
 };
 
+//how we're containing info related to child processes
 struct child_process {
   int pid;
   enum load_state load;
