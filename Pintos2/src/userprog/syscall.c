@@ -34,6 +34,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int i = 0;
+  //4 is the max number of arguments we can have.
   int arg[4];
   //PARSING STUFF INTO ARG HERE!!1    
   for (i; i < 4; i++)    
