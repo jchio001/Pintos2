@@ -212,8 +212,7 @@ int write (int fd, const void *buffer, unsigned size) {
   return write_bytes;
 }
 
-void seek (int fd, unsigned pos)
-{
+void seek (int fd, unsigned pos) {
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
   if (f == NULL) {

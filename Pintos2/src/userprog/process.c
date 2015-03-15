@@ -34,8 +34,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
-{
+process_execute (const char *file_name) {
   char *fn_copy;
   tid_t tid;
 
@@ -108,8 +107,7 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
-{
+process_wait (tid_t child_tid UNUSED) {
   struct child_process* cp = get_child_process(child_tid);
   if (!cp || cp->wait)    
       return -1;
@@ -477,8 +475,7 @@ void resize(void** esp, int argc, char** argv) {
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, const char* file_name, char** save_ptr) 
-{  
+setup_stack (void **esp, const char* file_name, char** save_ptr)  {  
   //initialize to false since always assume the worst.
   bool success = false;
 
