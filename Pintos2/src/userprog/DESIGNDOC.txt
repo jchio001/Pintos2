@@ -1,0 +1,328 @@
+		     +--------------------------+
+       	       	     |		CS 153		|
+		     | PROJECT 2: USER PROGRAMS	|
+		     | 	   DESIGN DOCUMENT     	|
+		     +--------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Jonathan Chiou <jchio001@ucr.edu>
+William Keidel <wkeid001@ucr.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+https://github.com/ilyanep/pintos-awesome/blob/master/src/userprog/DESIGNDOC
+
+			   ARGUMENT PASSING
+			   ================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In process.c/process.h:
+struct exec_helper {
+	const char* file_name;
+	struct semaphore *process_loading;
+	//Note: the loading semaphore in the thread struct may be
+	  enough, so might end up deleting this
+}
+-Used to help up with process-related code, the idea + skeleton was
+ given to us.
+
+the declaration of setup_stack was changed to:
+static bool setup_stack_helper (const char * cmd_line, uint8_t * 
+ kpage, uint8_t * upage, void ** esp) 
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?
+
+We push the elements of argv[] onto the stack in reverse order. In 
+order to  ensure that our stack does not grow into other sectors of
+memory, we check if we overflowed after each push onto the stack.
+
+---- RATIONALE ----
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+strtok() is not implemented because it is not thread safe. strtok() stores
+the location where the last token was found internally. When there's
+2 threads calling strtok(), there is a possibility that one of the threads
+will end up using the last token held by the other thread, which is not
+correct.
+
+>> A4: In Pintos, the kernel separates commands into a executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+
+-Flexibility: Using the shell provides some flexibility in terms of
+what we can do with the arguments. One example of this flexibility is that
+we are able to check the vailidity of our arguments before the kernel is
+given control.
+
+-For argument parsing, we will be using shell allocated memory versus
+the kernel. If this memory runs out, something really bad won't happen
+compared to if we used the kernel instead (if we're out of memory in 
+the kernel, the system will probably crash).
+
+			     SYSTEM CALLS
+			     ============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In thread.h:
+
+In the thread struct:
+-int fd: the file descriptor
+-struct file* cur_file: the current file being open by the process
+-struct child_process cp: A pointer to a specific child on the 
+ list of children (see below)
+-struct list children: a list of child structs, this is used to keep
+ track of the children of a given process
+-tid_t parent_id: the pid of the thread's parent
+
+In syscall.h:
+
+typedef enum {NOT_LOADED, SUCCESS, FAIL} load_state;
+-Created this enum to identify and record a child processes's
+ load state
+
+struct child_process {
+	int pid;
+	load_state load; //Loading status of a child process
+	bool wait; //Is this child process waiting for something?
+	bool exit; //Did this child process quit?
+	int status; //what is the status of this child? Might make
+		    //an enum for this
+};
+-This struct keeps information about a child process.
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+
+Each open file per process has a unique fd associated with it, and each
+process has its own file descriptor counter, which is incremented 
+whenever a file is opened. Because the fd counter is unique to a process,
+file descriptors are only unique within a process.
+
+---- ALGORITHMS ----
+
+>> B3: Describe your code for reading and writing user data from the
+>> kernel.
+
+We test the validity of the stack pointer by checking if it's less
+than the vritual address space of the kernel and if it's above the
+user's code address. If it's valid, we will dereference it, giving
+us info on the system call we're going to run. Each argument is then
+retrieved (each argument can be obtained from an incremented stack
+pointer, and we check it the same way we checked the original).
+
+If the argument in question is a pointer, we need to make sure it's
+a valid pointer, and then deferenced to a virutal address in our
+kernel.
+
+If we're dealing with string and buffers are our arguments, we will
+go through each individual byte and check if they're valid.
+
+Once we're done with all of this, we make the system call with the 
+given arguments.
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  What is the least
+>> and the greatest possible number of inspections of the page table
+>> (e.g. calls to pagedir_get_page()) that might result?  What about
+>> for a system call that only copies 2 bytes of data?  Is there room
+>> for improvement in these numbers, and how much?
+
+For both of these cases, we would need 2 calls at worst, as the byte
+distribution will be split into at most 2 pages.
+
+>> B5: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+
+When we give a process a PID, it will go through a list of child 
+processes for that specific PID. If there is no child with that
+PID or if the child is already waiting, we will return -1. If this
+is not the case, then the current process will wait until the child
+process exit (we will need some sort of identifier to say that we are
+waiting a specific child process). Once the child process exists, we
+will obtain it's exit status, remove the child from the parent
+process's list of children, and return the exit status.
+
+>> B6: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> paragraphs, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+
+In functions that need to check the validity of buffers and strings, 
+we need to check the validity of a single pointer. We also need to
+check the validity of a pointer by deferencing it, as there is chance
+that we could we working with an invalid pointer.
+
+Whenever a call to thread_exit() is made, a call to process_exit() will
+also be made if the calling thread is a user program. In the execution
+of process_exit(), the children and the file are freed. It will also
+close the executable (so that it's able to be written to again) and the
+exit vairable will be changed to reflect that the process is exiting.
+
+An example is if we have a user process that wants to write with a
+buffer of size 42, and the pointer to the 20th byte is faulty.
+-We will go through each pointer in the buffer size, and check its
+ valdity
+-On the 20th byte, we will check it, get that it's invalid, and call
+ exit(-1) to immediately terminate
+-The exit status will be send to the parent and we will exit
+-After this, resources will be freed apropriately and the thread in
+ question will be dead, meaning that another thread will be able to run.
+
+---- SYNCHRONIZATION ----
+
+>> B7: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+
+When exec is invoked by a process, we will create a child process and 
+put it into its list of children. The children will have a load
+variable, and that will be set to signify that the child has not
+finished loading. We will also have a sempahore to be downed to
+ensure that only 1 process will be loading at a time. Once we have
+completed loading this child process, we will change this load variable
+to signify if we have succeeded or failed our loading. The parent process
+will now be able to check the load value, and it will return -1 if the
+value reflects a failure.
+
+>> B8: Consider parent process P with child process C.  How do you
+>> ensure proper synchronization and avoid race conditions when P
+>> calls wait(C) before C exits?  After C exits?  How do you ensure
+>> that all resources are freed in each case?  How about when P
+>> terminates without waiting, before C exits?  After C exits?  Are
+>> there any special cases?
+
+We have a wait semaphore that's initialized to 0 and can only be at
+most 1.
+
+When P calls wait before C exits, it'll check the exit flag for the
+child, gets added to the waiting list of the semaphore until C
+changes the exit flag and ups the sempahore. Since the seamphore is
+now upped, P is no longer waiting and is awake. If P were to call
+wait after this point, it will not down the semaphore due to the fact
+that the exit flag is true. Once a parent process has finished waiting
+for a child process, the resources that must be freed (the child_process
+structs in the parent's list of children) will be freed.
+
+When P terminates before C exits, C will call thread_alive to see that 
+the parent is dead, and does not to gain access to the parent's list
+of children. 
+
+When P terminates after C exits and doesn't wait, C's child process
+sturct is freed. The same goes for all remaining child processes.
+
+If we're considering the initial thread (which is parentless), our
+call to thread_alive() to check the state of the parent will always
+return false.
+
+---- RATIONALE ----
+
+>> B9: Why did you choose to implement access to user memory from the
+>> kernel in the way that you did?
+
+It was the only method we were able to think of at the time; there is not
+enough time and knowledge given for us to consider anything else.
+
+>> B10: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+
+Because we have made so that our file descriptors are unique within a
+process, we do not have to worry about synchronization related to the
+file descriptors. A disadvantage of our implementation is that we do not
+account for overflow, as we believe that Pintos cannot possibly open enough
+files to overflow a standard integer.
+
+>> B11: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+
+As of now, we are thinking of just leaving it alone due to the fact that
+a process will only contain 1 thread. The advantage of this is that we
+can leave it alone and be fine, but if we were to do this in a multi-
+threaded-system, it will obviously fail. But we aren't, so everything
+should be fine.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+Too hard. There was really no sense of direction enforced, so it's really
+hard to find a path for working on something and then going down from
+there. For a majority of the project, the thought process was "What are
+we doing? Where do we go from here?".
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+As of right now, no.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+A concrete place to start needs to be established firmly and early. If
+there is no sense of direction, then a good amount of people will go 
+for the "too little too late" approach.
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+Hints on what to do are good, but sometimes the best way to teach something
+is to explicity tell someone exactly what they should do. Granted, this
+approach will not work in most cases, but the Pintos projects feel like
+something this approach will work on.
+
+>> Any other comments?
+I guess for these projects, they would be fine if students were able to 
+fully commit as much effort as they could onto them. But unfornately,
+most students take these classes in at least their junior year, which
+means that most of them can't fully commit to wokring on the projects.
+They have obligations to other classes and their corresponding projects,
+jobs that they have to work, and jobs that they have to secure in the
+future. Because of this factor, the projects feel a lot more difficult
+than they actually are due to time constraints. You can tell students
+to start early, but they won't until they actually know what to do,
+which takes time.
+
