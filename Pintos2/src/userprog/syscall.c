@@ -238,10 +238,13 @@ unsigned tell (int fd) {
   return offset;
 }
 
+//could make function return a bool, and then have whatever functions
+//calling it check to see if we get true/false and then exit(-1), but this
+//is simpler
 void check_valid_ptr (const void *ptr) {
 	//0x08048000 is the bottom address of our virtual address space
 	if (!is_user_vaddr(ptr) || ptr < 0x08048000){
-		exit(-1);
+		exit(-1); //exit(-1) to ensure that we cut our losses now.		
 	}
 }
 

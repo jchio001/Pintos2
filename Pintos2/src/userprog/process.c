@@ -23,11 +23,11 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp,
 		  char** save_ptr);
-static bool setup_stack (void **esp, const char* file_name,
-			 char** save_ptr);
+static bool setup_stack (void **esp, const char* file_name, char** save_ptr);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
+static void setup_stack_helper(void **esp, const char* file_name, char** save_ptr, uint8_t *kpage);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -468,42 +468,26 @@ void resize(void** esp, int argc, char** argv) {
 		memcpy(*esp, &argv[argc], s);
     }
  }
-
-/* Create a minimal stack by mapping a zeroed page at the top of
-   user virtual memory. */
-static bool
-setup_stack (void **esp, const char* file_name, char** save_ptr)  {  
-  //initialize to false since always assume the worst.
-  bool success = false;
-
-  uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else {
-		palloc_free_page (kpage);
-		return false;
-	  }
-  }
-  
+ 
+ //helper function for setup_stack, does most of the heavy lifting
+static void setup_stack_helper(void **esp, const char* file_name, char** saveptr, uint8_t *kpage) {
   int argc = 0;
   int argv_size = 2;
   
-  char *token;
+  char *ptr;
   char **argv = malloc(2*sizeof(char *));  
   
-  // Pushing our args onto the stack
-  for (token = (char *) file_name; token != NULL; token = strtok_r(NULL, " ", save_ptr)) {
-      *esp -= strlen(token) + 1;
+  // Pushing our args onto the stack, too hectic to make a seperate function for pushing
+  for (ptr = (char *) file_name; ptr != NULL; ptr = strtok_r(NULL, " ", saveptr)) {
+      *esp -= strlen(ptr) + 1;
       argv[argc] = *esp;
       argc++;
-      // Resize argv
-      if (argc >= argv_size) {
+      // Resize argv if needed
+      if (argv_size <= argc) {
 		argv_size *= 2;
 		argv = realloc(argv, argv_size*sizeof(char *));
 	  }
-      memcpy(*esp, token, strlen(token) + 1);
+      memcpy(*esp, ptr, strlen(ptr) + 1);
   }
   argv[argc] = 0;
   
@@ -518,16 +502,44 @@ setup_stack (void **esp, const char* file_name, char** save_ptr)  {
   }
     
   // Push argv, then argc, then our "return address", then free argv
-  token = *esp;
+  ptr = *esp;
   *esp -= sizeof(char **);
-  memcpy(*esp, &token, sizeof(char **));  
+  memcpy(*esp, &ptr, sizeof(char **));  
   *esp -= sizeof(int);
   memcpy(*esp, &argc, sizeof(int));  
   *esp -= sizeof(void *);
   memcpy(*esp, &argv[argc], sizeof(void *));  
   free(argv);
+	 
+}
 
-  return success;
+/* Create a minimal stack by mapping a zeroed page at the top of
+   user virtual memory. */
+static bool
+setup_stack (void **esp, const char* file_name, char** save_ptr)  {  
+  
+  //initialize to false since always assume the worst.
+  bool success = false;
+
+  uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL) {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success) {
+        *esp = PHYS_BASE;
+		setup_stack_helper(esp, file_name, save_ptr, kpage);
+		//SUCCESS HAS 2 C'S. REMEMBER FOR THE FUTURE.
+		//MADE SETUP_STACK_HELPER_VOID, SO CAN'T DO RETURN SET_UP_STACK(.....)
+		//TOO LAZY TO CHANGE.	
+		return success;		
+	  }        
+      else {
+		palloc_free_page (kpage);
+		return false;
+	  }
+  }
+  
+  return success; //putting this here to avoid a compiler warning
+  
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
